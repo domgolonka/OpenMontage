@@ -1,14 +1,44 @@
-"""Higgsfield video generation via Higgsfield Cloud API.
+"""Higgsfield video generation — RETIRED. This wrapper never worked.
 
-Multi-model orchestrator with proprietary Soul model for character-consistent,
-photorealistic video generation. Routes to Kling, Veo, Sora, and WAN under the hood.
+It was written against an API shape Higgsfield does not serve, so it reports
+UNAVAILABLE and refuses to execute. Every line below is kept only so the
+contract stays introspectable; nothing here reaches the network.
+
+What it sends vs what the service accepts (re-checked 2026-10-27 with the
+project's own working credentials in `.env`):
+
+    this wrapper                            the live API
+    ------------------------------------    ------------------------------------
+    POST platform.higgsfield.ai             POST api.higgsfield.ai/<endpoint_id>
+      /v1/generations                         one path per model workflow
+    Authorization: Bearer <key>             Authorization: Key <key_id>:<secret>
+      + X-API-Secret: <secret>                (one header)
+    a `model` field, enum of names          no `model` field; model *is* the path
+    GET /v1/generations/{id}                GET /requests/{id}/status
+    (no cancel)                             POST /requests/{id}/cancel, refunds
+    (no estimate)                           POST /estimate/<endpoint_id>, free
+
+The auth scheme alone is fatal: posting to the wrapper's own endpoint with the
+real key returns `401 {"detail":"Invalid credentials"}`, so no payload it builds
+can ever be accepted. The wrapper also under-quoted cost by ~7x — see
+`estimate_cost`.
+
+Replacement route
+-----------------
+Stock footage via the stock-source adapters in `tools/video/stock_sources/`
+(Pixabay video and Unsplash stills are the verified-working sources), reachable
+as BaseTools through `pixabay_video` / `video_selector`. That is what
+`fallback_tools` points at.
+
+Why retire rather than rewrite: a real client needs the credential format, one
+endpoint id per workflow, estimate-before-submit, status and cancel polling, and
+a price table read from the estimate endpoint rather than hard-coded. That is a
+new tool, not a patch. Retiring is the smaller, safer change — it removes a route
+that fails only *after* the selector has committed to it.
 """
 
 from __future__ import annotations
 
-import os
-import time
-from pathlib import Path
 from typing import Any
 
 from tools.base_tool import (
@@ -25,9 +55,18 @@ from tools.base_tool import (
 )
 
 # Single source of truth for the default model. Referenced by both the input
-# schema and every code path that reads `model`, so estimate_cost / estimate_runtime
-# / execute can never silently diverge from the advertised default again.
+# schema and every code path that reads `model`, so estimate_cost can never
+# silently diverge from the advertised default again.
 _DEFAULT_MODEL = "seedance_2.0"
+
+_RETIRED = (
+    "higgsfield_video is retired: it targets POST platform.higgsfield.ai/v1/generations "
+    "with `Authorization: Bearer` + `X-API-Secret`, which the live service rejects with "
+    "401 Invalid credentials. Use the stock-source route instead — pixabay_video, or "
+    "tools/video/stock_sources/ via video_selector. A real Higgsfield client would need "
+    "api.higgsfield.ai, one endpoint id per workflow, and estimate-before-submit; see "
+    "the module docstring."
+)
 
 
 class HiggsFieldVideo(BaseTool):
@@ -43,35 +82,32 @@ class HiggsFieldVideo(BaseTool):
 
     dependencies = []
     install_instructions = (
-        "Set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET for your Higgsfield Cloud credentials.\n"
-        "  Get them at https://cloud.higgsfield.ai/api-keys\n"
-        "  Alternatively, set HIGGSFIELD_KEY as a combined key:secret value."
+        "Nothing to install — higgsfield_video is retired and stays UNAVAILABLE even with "
+        "HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET set, because the endpoint it targets "
+        "rejects them. Use pixabay_video, or tools/video/stock_sources/ via video_selector."
     )
-    agent_skills = ["seedance-2-0", "ai-video-gen"]
+    # No skill should route work here; the seedance-2-0 skill lists the gateways
+    # that actually resolve.
+    agent_skills = []
 
-    capabilities = ["text_to_video", "image_to_video"]
+    capabilities: list[str] = []
+    # Nothing is advertised as supported: the service has these features, this
+    # wrapper cannot reach any of them. Leaving the premium flags set earned a
+    # "premium cinematic" bonus in lib/scoring.py and put a dead tool first.
     supports = {
-        "text_to_video": True,
-        "image_to_video": True,
-        "character_consistency": True,
-        "multi_model_routing": True,
-        "native_audio": True,
-        "cinematic_quality": True,
-        "camera_direction": True,
-        "lip_sync": True,
-        "multi_shot": True,
+        "text_to_video": False,
+        "image_to_video": False,
     }
-    best_for = [
-        "preferred premium video gen on Higgsfield (Seedance 2.0 is the default model)",
-        "cinematic trailers, teasers, and high-fidelity clips with native synchronized audio",
-        "character-consistent video generation (Soul ID + Seedance 2.0 identity consistency)",
-        "director-level camera control and multi-shot editing in a single generation",
-        "lip-sync from quoted dialogue in prompts",
-        "multi-model access through a single API (Seedance 2.0, Kling, Veo, Sora, WAN)",
+    best_for = []
+    not_good_for = [
+        "anything — retired wrapper, written against an API shape Higgsfield does not serve",
     ]
-    not_good_for = ["offline generation", "fine-grained model control", "budget projects without subscription"]
-    fallback_tools = ["seedance_video", "seedance_replicate", "kling_video", "veo_video", "minimax_video"]
-    quality_score = 0.9
+    # The replacement route: the stock-source adapters, which are verified working.
+    # Stock is deliberately first. Silently re-routing an explicit Higgsfield
+    # request to another premium gateway would spend money the caller never asked
+    # for, and this tool's own mis-quoting of cost is half the bug.
+    fallback_tools = ["pixabay_video", "seedance_video", "seedance_replicate", "kling_video", "veo_video"]
+    quality_score = 0.0
 
     input_schema = {
         "type": "object",
@@ -95,7 +131,10 @@ class HiggsFieldVideo(BaseTool):
                     "soul_cinema",
                 ],
                 "default": _DEFAULT_MODEL,
-                "description": "Underlying model. Defaults to Seedance 2.0 (preferred premium) — see .agents/skills/seedance-2-0/",
+                "description": (
+                    "Never sent. The live API has no `model` field — the model is the URL path "
+                    "(one endpoint id per workflow). Kept so estimate_cost stays introspectable."
+                ),
             },
             "duration": {
                 "type": "string",
@@ -113,152 +152,75 @@ class HiggsFieldVideo(BaseTool):
         },
     }
 
+    # Consumes nothing and opens no socket: execute() returns a refusal.
     resource_profile = ResourceProfile(
-        cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True
+        cpu_cores=0, ram_mb=0, vram_mb=0, disk_mb=0, network_required=False
     )
-    retry_policy = RetryPolicy(max_retries=2, retryable_errors=["rate_limit", "timeout"])
+    retry_policy = RetryPolicy(max_retries=0, retryable_errors=[])
     idempotency_key_fields = ["prompt", "model", "operation", "duration"]
-    side_effects = ["writes video file to output_path", "calls Higgsfield Cloud API"]
-    user_visible_verification = ["Watch generated clip for motion coherence and visual quality"]
-
-    def _get_credentials(self) -> tuple[str, str] | None:
-        """Return (api_key, api_secret) or None if not configured."""
-        combined = os.environ.get("HIGGSFIELD_KEY")
-        if combined and ":" in combined:
-            key, secret = combined.split(":", 1)
-            return key, secret
-        key = os.environ.get("HIGGSFIELD_API_KEY")
-        secret = os.environ.get("HIGGSFIELD_API_SECRET")
-        if key and secret:
-            return key, secret
-        return None
+    side_effects = []
+    user_visible_verification = []
 
     def get_status(self) -> ToolStatus:
-        if self._get_credentials():
-            return ToolStatus.AVAILABLE
+        """Always UNAVAILABLE — credentials are not the problem.
+
+        Deliberately ignores HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET.
+        Returning AVAILABLE because keys exist is what made this a trap:
+        `video_selector` ranked it first for cinematic briefs and only
+        discovered the 401 after it had committed to the provider. UNAVAILABLE
+        drops it from `video_selector._select_best_tool` and from
+        `tool_registry.find_fallback`.
+        """
         return ToolStatus.UNAVAILABLE
 
     def estimate_cost(self, inputs: dict[str, Any]) -> float:
+        """What this would really cost, per second, if the wrapper worked.
+
+        The old table was per *clip* and quoted $0.80 for a 5 s Seedance clip.
+        The rates below came from `POST api.higgsfield.ai/estimate/<endpoint_id>`
+        on 2026-10-27 — free, authenticated, and the only safe way to price a
+        model. Seedance 2.5 at 1080p is $1.1372 per second, so that same 5 s
+        clip is $5.69 and a 30 s scene is $34: the old table was ~7x low, in the
+        direction that costs money. Quoted rates are the 16:9 figure; vertical
+        9:16 bills more per second, so treat these as a floor.
+
+        An unlisted model falls back to the dearest known rate, never a cheap
+        guess — under-quoting is the failure mode that matters here.
+        """
         model = inputs.get("model", _DEFAULT_MODEL)
         duration = int(inputs.get("duration", "5"))
-        # Approximate per-clip costs based on Higgsfield credit pricing.
-        # Seedance 2.0 on Higgsfield runs ~50-80 credits per 5s clip ≈ $0.50-$1.20.
-        base_costs = {
-            "seedance_2.0": 0.80,
-            "seedance_2.0_fast": 0.50,
-            "kling_3.0": 0.10,
-            "wan_2.5": 0.10,
-            "veo_3.1": 0.50,
-            "sora_2": 0.50,
-            "soul_cinema": 0.15,
+        usd_per_second = {
+            "seedance_2.0": 1.1372,       # bytedance/seedance-2.5/*, 1080p
+            "seedance_2.0_fast": 0.4622,  # same family at 720p
+            "kling_3.0": 0.0840,          # kling-video/o3/image-reference, $0.420 / 5 s
+            "wan_2.5": 0.0840,
         }
-        base = base_costs.get(model, 0.15)
-        return base * (duration / 5)
+        rate = usd_per_second.get(model, max(usd_per_second.values()))
+        return round(rate * duration, 4)
 
     def estimate_runtime(self, inputs: dict[str, Any]) -> float:
-        model = inputs.get("model", _DEFAULT_MODEL)
-        if model in ("veo_3.1", "sora_2", "seedance_2.0"):
-            return 120.0
-        if model == "seedance_2.0_fast":
-            return 60.0
-        return 60.0
+        """Zero — `execute()` refuses immediately instead of polling for six minutes."""
+        return 0.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        creds = self._get_credentials()
-        if not creds:
-            return ToolResult(
-                success=False,
-                error="Higgsfield credentials not set. " + self.install_instructions,
-            )
+        """Refuse, without touching the network.
 
-        import requests
-
-        api_key, api_secret = creds
-        start = time.time()
-        operation = inputs.get("operation", "text_to_video")
-        model = inputs.get("model", _DEFAULT_MODEL)
-
-        payload: dict[str, Any] = {
-            "prompt": inputs["prompt"],
-            "model": model,
-            "task": operation.replace("_", "-"),
-        }
-        if inputs.get("duration"):
-            payload["duration"] = int(inputs["duration"])
-        if inputs.get("aspect_ratio"):
-            payload["aspect_ratio"] = inputs["aspect_ratio"]
-        if operation == "image_to_video" and inputs.get("image_url"):
-            payload["image_url"] = inputs["image_url"]
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "X-API-Secret": api_secret,
-            "Content-Type": "application/json",
-        }
-
-        try:
-            # Submit generation request
-            submit_resp = requests.post(
-                "https://platform.higgsfield.ai/v1/generations",
-                headers=headers,
-                json=payload,
-                timeout=30,
-            )
-            submit_resp.raise_for_status()
-            gen_data = submit_resp.json()
-            generation_id = gen_data["id"]
-            status_url = gen_data.get("status_url", f"https://platform.higgsfield.ai/v1/generations/{generation_id}")
-
-            # Poll for completion
-            video_url = None
-            for _ in range(72):  # max ~6 minutes
-                time.sleep(5)
-                poll_resp = requests.get(status_url, headers=headers, timeout=15)
-                poll_resp.raise_for_status()
-                poll_data = poll_resp.json()
-                status = poll_data.get("status", "Unknown")
-
-                if status in ("Completed", "COMPLETED"):
-                    video_url = poll_data.get("output_url") or poll_data.get("url")
-                    break
-                if status in ("Failed", "FAILED", "NSFW", "Cancelled", "CANCELLED"):
-                    return ToolResult(
-                        success=False,
-                        error=f"Higgsfield generation {status}: {poll_data.get('error', 'unknown')}",
-                    )
-
-            if not video_url:
-                return ToolResult(success=False, error="Higgsfield generation timed out.")
-
-            # Download video
-            video_response = requests.get(video_url, timeout=120)
-            video_response.raise_for_status()
-
-            output_path = Path(inputs.get("output_path", "higgsfield_output.mp4"))
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_bytes(video_response.content)
-
-        except Exception as e:
-            return ToolResult(success=False, error=f"Higgsfield video generation failed: {e}")
-
-        from tools.video._shared import probe_output
-
-        probed = probe_output(output_path)
+        The previous body built a payload, POSTed it to
+        platform.higgsfield.ai/v1/generations and polled for six minutes. With
+        the project's real key that request returns
+        `401 {"detail":"Invalid credentials"}` every time, because the live API
+        wants a single `Authorization: Key <key_id>:<secret>` header on
+        api.higgsfield.ai/<endpoint_id>. Failing here, with the replacement
+        route named, beats spending six minutes to arrive at the same answer.
+        """
         return ToolResult(
-            success=True,
+            success=False,
+            error=_RETIRED,
             data={
                 "provider": "higgsfield",
-                "model": model,
-                "prompt": inputs["prompt"],
-                "operation": operation,
-                "aspect_ratio": inputs.get("aspect_ratio", "16:9"),
-                "output": str(output_path),
-                "output_path": str(output_path),
-                "format": "mp4",
-                **probed,
+                "retired": True,
+                "replacement_tools": list(self.fallback_tools),
+                "quoted_cost_usd": self.estimate_cost(inputs),
             },
-            artifacts=[str(output_path)],
-            cost_usd=self.estimate_cost(inputs),
-            duration_seconds=round(time.time() - start, 2),
-            model=model,
+            duration_seconds=0.0,
         )
