@@ -163,7 +163,7 @@ Selectors route based on: user preference when explicitly set, then scored ranki
 
 **Subtitle (1):** subtitle_gen
 
-**Video (18):** grok_video, heygen_video, higgsfield_video, veo_video, kling_video, runway_video, minimax_video, wan_video, hunyuan_video, cogvideo_video, ltx_video_local, ltx_video_modal, pexels_video, pixabay_video, video_selector, video_compose (FFmpeg), video_stitch, video_trimmer
+**Video (18):** grok_video, heygen_video, higgsfield_video (retired — always UNAVAILABLE), veo_video, kling_video, runway_video, minimax_video, wan_video, hunyuan_video, cogvideo_video, ltx_video_local, ltx_video_modal, pexels_video, pixabay_video, video_selector, video_compose (FFmpeg), video_stitch, video_trimmer
 
 ---
 
@@ -395,7 +395,7 @@ All config is validated via Pydantic models in `lib/config_model.py`.
 | `PIXABAY_API_KEY` | pixabay_image, pixabay_video | Stock media |
 | `GOOGLE_API_KEY` | google_imagen, google_tts | Google Imagen images, Google Cloud TTS |
 | `RUNWAY_API_KEY` | runway_video | Runway Gen-3/Gen-4 direct |
-| `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | higgsfield_video | Higgsfield multi-model video |
+| `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | none | Unused — higgsfield_video is retired and stays UNAVAILABLE |
 | `MODAL_LTX2_ENDPOINT_URL` | ltx_video_modal | Self-hosted LTX-2 |
 | `VIDEO_GEN_LOCAL_ENABLED` | local video tools | Enable local GPU generation |
 | `VIDEO_GEN_LOCAL_MODEL` | wan, hunyuan, ltx, cogvideo | Select local model |

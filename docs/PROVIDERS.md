@@ -966,45 +966,46 @@ Gen-3 Alpha Turbo and Gen-4 Aleph were removed from the Runway API on
 
 ---
 
-### Higgsfield — Multi-Model Video Orchestrator
+### Higgsfield — Multi-Model Video Orchestrator (tool retired)
 
-> **Multi-model video platform.** Routes to Kling 3.0, Veo 3.1, Sora 2, WAN 2.5, and proprietary Soul Cinema through a single API. Includes Soul ID for character consistency across clips.
+> **No tool in this repo reaches Higgsfield.** `higgsfield_video` was written
+> against an API shape Higgsfield does not serve —
+> `POST platform.higgsfield.ai/v1/generations` with `Authorization: Bearer` plus
+> an `X-API-Secret` header. The live API is `api.higgsfield.ai`, a single
+> `Authorization: Key <key_id>:<secret>` header, and one path per model
+> workflow. Re-checked 2026-10-27 with real credentials: the wrapper's endpoint
+> answers `401 Invalid credentials`, so no payload it builds can be accepted.
+> The tool now reports UNAVAILABLE and refuses to run, so nothing routes into it.
+>
+> **Use instead:** stock footage via `pixabay_video`, or the adapters in
+> `tools/video/stock_sources/` through `video_selector`; or any generation
+> gateway in this file that resolves.
 
-**Tools unlocked:** `higgsfield_video`
-**Env vars:** `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` (or combined `HIGGSFIELD_KEY=key:secret`)
+**Tools unlocked:** none — `higgsfield_video` is retired
+**Env vars:** none. Setting `HIGGSFIELD_API_KEY` / `HIGGSFIELD_API_SECRET` enables nothing.
 
-#### Setup
+#### What a working client would need
 
-1. Go to [cloud.higgsfield.ai](https://cloud.higgsfield.ai/) and create an account
-2. Subscribe to a plan (Starter or above for API access)
-3. Navigate to API Keys section at [cloud.higgsfield.ai/api-keys](https://cloud.higgsfield.ai/api-keys)
-4. Generate an API key and secret
-5. Add to `.env`:
-   ```
-   HIGGSFIELD_API_KEY=your-api-key
-   HIGGSFIELD_API_SECRET=your-api-secret
-   ```
+Not done, and not planned here: `api.higgsfield.ai`, one endpoint id per model
+workflow, estimate-before-submit (`POST /estimate/<endpoint_id>` is free and
+validates parameters), status (`GET /requests/{id}/status`) and cancel
+(`POST /requests/{id}/cancel`, which refunds a queued request).
 
 #### Pricing
 
-| Plan | Price | Notes |
-|------|-------|-------|
-| Free | $0 | Limited credits |
-| Starter | $15/mo | Basic allocation |
-| Plus | $34/mo | Mid-tier, ~33-56 Kling 3.0 clips |
-| Ultra | $84/mo | High volume |
+The old table here quoted per-clip costs an order of magnitude below the real
+ones. Measured from the live estimate endpoint on 2026-10-27, per **second** of
+output (16:9; vertical 9:16 bills more):
 
-**Per-generation costs (approximate, via credits):**
+| Model | Cost | A 5 s clip | A 30 s scene |
+|-------|------|-----------|--------------|
+| Seedance 2.5 @ 1080p | $1.1372/s | $5.69 | $34.12 |
+| Seedance 2.5 @ 720p | $0.4622/s | $2.31 | $13.87 |
+| Kling O3 image-reference | $0.0840/s | $0.42 | $2.52 |
 
-| Model | Cost per clip |
-|-------|--------------|
-| Kling 3.0 | ~$0.10 (cheapest) |
-| WAN 2.5 | ~$0.10 |
-| Soul Cinema | ~$0.15 |
-| Veo 3.1 | ~$0.50 |
-| Sora 2 | ~$0.50 |
-
-**Free tier:** Limited credits on signup. No monthly renewal on free plan.
+Price any Higgsfield model from `POST /estimate/<endpoint_id>` before spending.
+A token-priced model answers with a prose rate card and no number for your
+request — treat that as "price it yourself", never as "cheap".
 
 ---
 
@@ -1455,7 +1456,7 @@ These tools require only FFmpeg or Python packages — no GPU, no API key.
 | **OpenAI** | `OPENAI_API_KEY` | `openai_tts`, `openai_image` | Paid only |
 | **xAI** | `XAI_API_KEY` | `grok_image`, `grok_video` | Paid only |
 | **Runway** | `RUNWAY_API_KEY` | `runway_video` | Free trial + paid |
-| **Higgsfield** | `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | `higgsfield_video` | Subscription ($15-84/mo) |
+| **Higgsfield** | — | none (`higgsfield_video` retired) | n/a |
 | **HeyGen** | `HEYGEN_API_KEY` | `heygen_video` | Pay-as-you-go |
 | **Suno** | `SUNO_API_KEY` | `suno_music` | Pay-as-you-go |
 | **Tencent Hunyuan** | `TENCENT_TOKENHUB_API_KEY` | `hunyuan_cloud_video` | Pay-as-you-go (~$0.25–0.83/gen) |
